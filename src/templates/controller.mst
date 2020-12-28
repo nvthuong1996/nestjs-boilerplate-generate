@@ -1,0 +1,34 @@
+{}
+import { Controller } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+import { Crud, CrudController } from '@nestjsx/crud';
+
+import { {{toEntityName tscName}} } from '../entities/{{toFileName fileName}}';
+import { {{toServiceName tscName}} } from '../services/{{toServiceFileName fileName}}';
+import { {{toDtoName tscName}} } from '../dtos/{{toDtoFileName fileName}}';
+
+
+
+
+@Crud({
+    model: {
+        type: {{toEntityName tscName}},
+    },
+    dto:{
+        create:{{toDtoName tscName}},
+        update:{{toDtoName tscName}},
+        replace:{{toDtoName tscName}}
+    },
+    query:{
+        join: {
+           {{#each relationsOneToMany}}
+             {{this.fieldName}}:{},
+           {{/each}}
+        }
+    }
+})
+@ApiTags('{{tscName}}')
+@Controller('{{tscName}}')
+export class {{toControllerName tscName}} implements CrudController<{{toEntityName tscName}}> {
+    constructor(public service: {{toServiceName tscName}}) {}
+}

@@ -26,29 +26,98 @@ export default function modelGenerationPhase(
         fs.mkdirSync(resultPath);
     }
     let entitiesPath = resultPath;
+    let servicesPath;
+    let controllerPath;
+    let dtoPath;
+    const modulePath = resultPath;
     if (!generationOptions.noConfigs) {
-        createTsConfigFile(resultPath);
-        createTypeOrmConfig(resultPath, connectionOptions);
+        // createTsConfigFile(resultPath);
+        // createTypeOrmConfig(resultPath, connectionOptions);
         entitiesPath = path.resolve(resultPath, "./entities");
         if (!fs.existsSync(entitiesPath)) {
             fs.mkdirSync(entitiesPath);
+        }
+        servicesPath = path.resolve(resultPath, "./services");
+        if (!fs.existsSync(servicesPath)) {
+            fs.mkdirSync(servicesPath);
+        }
+        controllerPath = path.resolve(resultPath, "./controllers");
+        if (!fs.existsSync(controllerPath)) {
+            fs.mkdirSync(controllerPath);
+        }
+        dtoPath = path.resolve(resultPath, "./dtos");
+        if (!fs.existsSync(dtoPath)) {
+            fs.mkdirSync(dtoPath);
         }
     }
     if (generationOptions.indexFile) {
         createIndexFile(databaseModel, generationOptions, entitiesPath);
     }
     generateModels(databaseModel, generationOptions, entitiesPath);
+    generateServices(databaseModel, generationOptions, servicesPath);
+    generateControllers(databaseModel, generationOptions, controllerPath);
+    generateModules(databaseModel, generationOptions, modulePath);
+    generateDto(databaseModel, generationOptions, dtoPath);
 }
 
-function generateModels(
+function generateModules(
     databaseModel: Entity[],
     generationOptions: IGenerationOptions,
-    entitiesPath: string
+    modulePath: string
 ) {
     const entityTemplatePath = path.resolve(
         __dirname,
         "templates",
-        "entity.mst"
+        "module.mst"
+    );
+    const entityTemplate = fs.readFileSync(entityTemplatePath, "utf-8");
+    const entityCompliedTemplate = Handlebars.compile(entityTemplate, {
+        noEscape: true,
+    });
+
+    const moduleName = modulePath.split("/").pop();
+
+    const renderData = { moduleName, databaseModel };
+
+    const resultFilePath = path.resolve(modulePath, `${moduleName}.module.ts`);
+
+    const rendered = entityCompliedTemplate(renderData);
+    const withImportStatements = removeUnusedImports(
+        EOL !== eolConverter[generationOptions.convertEol]
+            ? rendered.replace(
+                  /(\r\n|\n|\r)/gm,
+                  eolConverter[generationOptions.convertEol]
+              )
+            : rendered
+    );
+    let formatted = "";
+    try {
+        formatted = Prettier.format(
+            withImportStatements.replace("{}", ""),
+            prettierOptions
+        );
+    } catch (error) {
+        console.error(
+            "There were some problems with model generation for module"
+        );
+        console.error(error);
+        formatted = withImportStatements;
+    }
+    fs.writeFileSync(resultFilePath, formatted, {
+        encoding: "utf-8",
+        flag: "w",
+    });
+}
+
+function generateControllers(
+    databaseModel: Entity[],
+    generationOptions: IGenerationOptions,
+    servicesPath: string
+) {
+    const entityTemplatePath = path.resolve(
+        __dirname,
+        "templates",
+        "controller.mst"
     );
     const entityTemplate = fs.readFileSync(entityTemplatePath, "utf-8");
     const entityCompliedTemplate = Handlebars.compile(entityTemplate, {
@@ -73,8 +142,233 @@ function generateModels(
                 throw new Error("Unknown case style");
         }
         const resultFilePath = path.resolve(
+            servicesPath,
+            `${casedFileName}.controller.ts`
+        );
+        const rendered = entityCompliedTemplate({
+            ...element,
+            relationsOneToMany: element.relations.filter(
+                (e) => e.relationType === "OneToMany"
+            ),
+        });
+        const withImportStatements = removeUnusedImports(
+            EOL !== eolConverter[generationOptions.convertEol]
+                ? rendered.replace(
+                      /(\r\n|\n|\r)/gm,
+                      eolConverter[generationOptions.convertEol]
+                  )
+                : rendered
+        );
+        let formatted = "";
+        try {
+            formatted = Prettier.format(
+                withImportStatements.replace("{}", ""),
+                prettierOptions
+            );
+        } catch (error) {
+            console.error(
+                "There were some problems with model generation for table: ",
+                element.sqlName
+            );
+            console.error(error);
+            formatted = withImportStatements;
+        }
+        fs.writeFileSync(resultFilePath, formatted, {
+            encoding: "utf-8",
+            flag: "w",
+        });
+    });
+}
+
+function generateServices(
+    databaseModel: Entity[],
+    generationOptions: IGenerationOptions,
+    servicesPath: string
+) {
+    const entityTemplatePath = path.resolve(
+        __dirname,
+        "templates",
+        "service.mst"
+    );
+    const entityTemplate = fs.readFileSync(entityTemplatePath, "utf-8");
+    const entityCompliedTemplate = Handlebars.compile(entityTemplate, {
+        noEscape: true,
+    });
+    databaseModel.forEach((element) => {
+        let casedFileName = "";
+        switch (generationOptions.convertCaseFile) {
+            case "camel":
+                casedFileName = changeCase.camelCase(element.fileName);
+                break;
+            case "param":
+                casedFileName = changeCase.paramCase(element.fileName);
+                break;
+            case "pascal":
+                casedFileName = changeCase.pascalCase(element.fileName);
+                break;
+            case "none":
+                casedFileName = element.fileName;
+                break;
+            default:
+                throw new Error("Unknown case style");
+        }
+        const resultFilePath = path.resolve(
+            servicesPath,
+            `${casedFileName}.service.ts`
+        );
+        const rendered = entityCompliedTemplate(element);
+        const withImportStatements = removeUnusedImports(
+            EOL !== eolConverter[generationOptions.convertEol]
+                ? rendered.replace(
+                      /(\r\n|\n|\r)/gm,
+                      eolConverter[generationOptions.convertEol]
+                  )
+                : rendered
+        );
+        let formatted = "";
+        try {
+            formatted = Prettier.format(
+                withImportStatements.replace("{}", ""),
+                prettierOptions
+            );
+        } catch (error) {
+            console.error(
+                "There were some problems with model generation for table: ",
+                element.sqlName
+            );
+            console.error(error);
+            formatted = withImportStatements;
+        }
+        fs.writeFileSync(resultFilePath, formatted, {
+            encoding: "utf-8",
+            flag: "w",
+        });
+    });
+}
+
+function generateDto(
+    databaseModel: Entity[],
+    generationOptions: IGenerationOptions,
+    entitiesPath: string
+) {
+    const entityTemplatePath = path.resolve(__dirname, "templates", "dto.mst");
+    const entityTemplate = fs.readFileSync(entityTemplatePath, "utf-8");
+    const entityCompliedTemplate = Handlebars.compile(entityTemplate, {
+        noEscape: true,
+    });
+    databaseModel.forEach((entity) => {
+        let casedFileName = "";
+        const element = { ...entity };
+
+        element.columns = element.columns.filter((e) => {
+            const join = element.relations.filter(
+                (f) => f.relationType === "ManyToOne"
+            );
+            let check = true;
+            join.forEach((g) => {
+                if (
+                    g.joinColumnOptions &&
+                    g.joinColumnOptions.find((f) => f.name === e.tscName)
+                ) {
+                    check = false;
+                }
+            });
+            if (e.primary) {
+                check = false;
+            }
+            return check;
+        });
+        element.relations = element.relations.filter(
+            (f) => f.relationType === "OneToMany"
+        );
+
+        switch (generationOptions.convertCaseFile) {
+            case "camel":
+                casedFileName = changeCase.camelCase(element.fileName);
+                break;
+            case "param":
+                casedFileName = changeCase.paramCase(element.fileName);
+                break;
+            case "pascal":
+                casedFileName = changeCase.pascalCase(element.fileName);
+                break;
+            case "none":
+                casedFileName = element.fileName;
+                break;
+            default:
+                throw new Error("Unknown case style");
+        }
+        const resultFilePath = path.resolve(
             entitiesPath,
-            `${casedFileName}.ts`
+            `${casedFileName}.dto.ts`
+        );
+        const rendered = entityCompliedTemplate(element);
+        const withImportStatements = removeUnusedImports(
+            EOL !== eolConverter[generationOptions.convertEol]
+                ? rendered.replace(
+                      /(\r\n|\n|\r)/gm,
+                      eolConverter[generationOptions.convertEol]
+                  )
+                : rendered
+        );
+        let formatted = "";
+        try {
+            formatted = Prettier.format(
+                withImportStatements.replace("{}", ""),
+                prettierOptions
+            );
+        } catch (error) {
+            console.error(
+                "There were some problems with model generation for table: ",
+                element.sqlName
+            );
+            console.error(error);
+            formatted = withImportStatements;
+        }
+        fs.writeFileSync(resultFilePath, formatted, {
+            encoding: "utf-8",
+            flag: "w",
+        });
+    });
+}
+
+function generateModels(
+    databaseModel: Entity[],
+    generationOptions: IGenerationOptions,
+    entitiesPath: string
+) {
+    const entityTemplatePath = path.resolve(
+        __dirname,
+        "templates",
+        "entity.mst"
+    );
+    const entityTemplate = fs.readFileSync(entityTemplatePath, "utf-8");
+    const entityCompliedTemplate = Handlebars.compile(entityTemplate, {
+        noEscape: true,
+    });
+    databaseModel.forEach((entity) => {
+        let casedFileName = "";
+        const element = { ...entity };
+        element.columns = element.columns.filter((e) => !e.primary);
+        switch (generationOptions.convertCaseFile) {
+            case "camel":
+                casedFileName = changeCase.camelCase(element.fileName);
+                break;
+            case "param":
+                casedFileName = changeCase.paramCase(element.fileName);
+                break;
+            case "pascal":
+                casedFileName = changeCase.pascalCase(element.fileName);
+                break;
+            case "none":
+                casedFileName = element.fileName;
+                break;
+            default:
+                throw new Error("Unknown case style");
+        }
+        const resultFilePath = path.resolve(
+            entitiesPath,
+            `${casedFileName}.entity.ts`
         );
         const rendered = entityCompliedTemplate(element);
         const withImportStatements = removeUnusedImports(
@@ -173,7 +467,24 @@ function createHandlebarsHelpers(generationOptions: IGenerationOptions): void {
             default:
                 throw new Error("Unknown case style");
         }
-        return retStr;
+        return `${retStr}Entity`;
+    });
+    Handlebars.registerHelper("toDtoName", (str) => {
+        let retStr = "";
+        switch (generationOptions.convertCaseEntity) {
+            case "camel":
+                retStr = changeCase.camelCase(str);
+                break;
+            case "pascal":
+                retStr = changeCase.pascalCase(str);
+                break;
+            case "none":
+                retStr = str;
+                break;
+            default:
+                throw new Error("Unknown case style");
+        }
+        return `${retStr}Dto`;
     });
     Handlebars.registerHelper("toFileName", (str) => {
         let retStr = "";
@@ -193,8 +504,121 @@ function createHandlebarsHelpers(generationOptions: IGenerationOptions): void {
             default:
                 throw new Error("Unknown case style");
         }
-        return retStr;
+        return `${retStr}.entity`;
     });
+    Handlebars.registerHelper("toDtoFileName", (str) => {
+        let retStr = "";
+        switch (generationOptions.convertCaseFile) {
+            case "camel":
+                retStr = changeCase.camelCase(str);
+                break;
+            case "param":
+                retStr = changeCase.paramCase(str);
+                break;
+            case "pascal":
+                retStr = changeCase.pascalCase(str);
+                break;
+            case "none":
+                retStr = str;
+                break;
+            default:
+                throw new Error("Unknown case style");
+        }
+        return `${retStr}.dto`;
+    });
+    Handlebars.registerHelper("toServiceName", (str) => {
+        let retStr = "";
+        switch (generationOptions.convertCaseEntity) {
+            case "camel":
+                retStr = changeCase.camelCase(str);
+                break;
+            case "pascal":
+                retStr = changeCase.pascalCase(str);
+                break;
+            case "none":
+                retStr = str;
+                break;
+            default:
+                throw new Error("Unknown case style");
+        }
+        return `${retStr}Service`;
+    });
+
+    Handlebars.registerHelper("toModuleName", (str) => {
+        let retStr = "";
+        switch (generationOptions.convertCaseEntity) {
+            case "camel":
+                retStr = changeCase.camelCase(str);
+                break;
+            case "pascal":
+                retStr = changeCase.pascalCase(str);
+                break;
+            case "none":
+                retStr = str;
+                break;
+            default:
+                throw new Error("Unknown case style");
+        }
+        return `${retStr}Module`;
+    });
+
+    Handlebars.registerHelper("toControllerName", (str) => {
+        let retStr = "";
+        switch (generationOptions.convertCaseEntity) {
+            case "camel":
+                retStr = changeCase.camelCase(str);
+                break;
+            case "pascal":
+                retStr = changeCase.pascalCase(str);
+                break;
+            case "none":
+                retStr = str;
+                break;
+            default:
+                throw new Error("Unknown case style");
+        }
+        return `${retStr}Controller`;
+    });
+
+    Handlebars.registerHelper("toControllerFileName", (str) => {
+        let retStr = "";
+        switch (generationOptions.convertCaseFile) {
+            case "camel":
+                retStr = changeCase.camelCase(str);
+                break;
+            case "pascal":
+                retStr = changeCase.pascalCase(str);
+                break;
+            case "none":
+                retStr = str;
+                break;
+            default:
+                throw new Error("Unknown case style");
+        }
+        return `${retStr}.controller`;
+    });
+
+    Handlebars.registerHelper("toServiceFileName", (str) => {
+        let retStr = "";
+        switch (generationOptions.convertCaseFile) {
+            case "camel":
+                retStr = changeCase.camelCase(str);
+                break;
+            case "param":
+                retStr = changeCase.paramCase(str);
+                break;
+            case "pascal":
+                retStr = changeCase.pascalCase(str);
+                break;
+            case "none":
+                retStr = str;
+                break;
+            default:
+                throw new Error("Unknown case style");
+        }
+        return `${retStr}.service`;
+    });
+
     Handlebars.registerHelper("printPropertyVisibility", () =>
         generationOptions.propertyVisibility !== "none"
             ? `${generationOptions.propertyVisibility} `

@@ -31,9 +31,8 @@ import {{localImport (toEntityName entityName)}} from './{{toFileName fileName}}
 }
 {{/inline}}
 {{#*inline "Entity"}}
-{{#indices}}{{> Index}}{{/indices~}}
-@Entity("{{sqlName}}"{{#schema}} ,{schema:"{{.}}"{{#if ../database}}, database:"{{../database}}"{{/if}} } {{/schema}})
-export {{defaultExport}} class {{toEntityName tscName}}{{#activeRecord}} extends BaseEntity{{/activeRecord}} {
+@Entity("{{sqlName}}")
+export {{defaultExport}} class {{toEntityName tscName}} extends AbstractEntity{
 
 {{#columns}}{{> Column}}{{/columns~}}
 {{#relations}}{{> Relation}}{{/relations~}}
@@ -42,6 +41,8 @@ export {{defaultExport}} class {{toEntityName tscName}}{{#activeRecord}} extends
 }
 {{/inline}}
 import {BaseEntity,Column,Entity,Index,JoinColumn,JoinTable,ManyToMany,ManyToOne,OneToMany,OneToOne,PrimaryColumn,PrimaryGeneratedColumn,RelationId} from "typeorm";
+import { AbstractEntity } from '@common/abstract.entity';
+
 {{#fileImports}}{{> Import}}{{/fileImports}}
 
 {{> Entity}}

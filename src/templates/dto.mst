@@ -1,0 +1,47 @@
+{{#*inline "Index"}}
+@Index("{{name}}",[{{#columns}}"{{toPropertyName .}}",{{/columns~}}],{ {{json options}} })
+{{/inline}}
+{{#*inline "Import"}}
+import {{localImport (toDtoName entityName)}} from './{{toDtoFileName fileName}}'
+{{/inline}}
+{{#*inline "Column"}}
+@ApiProperty()
+{{#if options.nullable}}@ApiPropertyOptional(){{/if}}
+{{printPropertyVisibility}}{{toPropertyName tscName}}{{strictMode}}:{{tscType}}{{#if options.nullable}} | null{{/if}};
+
+{{/inline}}
+
+{{#*inline "Relation"}}
+@ApiProperty({
+        type: {{toDtoName relatedTable}},
+        isArray: true,
+})
+@ApiPropertyOptional()
+{{printPropertyVisibility}}{{toPropertyName fieldName}}{{strictMode}}:{{toRelation (toDtoName relatedTable) relationType}};
+
+{{/inline}}
+{{#*inline "RelationId"}}
+@RelationId(({{toPropertyName entityName}}:{{toDtoName entityName}})=>{{toPropertyName entityName}}.{{toPropertyName relationField}})
+{{printPropertyVisibility}}{{toPropertyName fieldName}}{{strictMode}}:{{fieldType}};
+
+{{/inline}}
+{{#*inline "Constructor"}}
+{{printPropertyVisibility}}constructor(init?: Partial<{{toDtoName entityName}}>) {
+    {{#activeRecord}}super();
+    {{/activeRecord}}Object.assign(this, init);
+}
+{{/inline}}
+{{#*inline "Entity"}}
+export {{defaultExport}} class {{toDtoName tscName}}{{#activeRecord}} extends BaseEntity{{/activeRecord}} {
+
+{{#columns}}{{> Column}}{{/columns~}}
+{{#relations}}{{> Relation}}{{/relations~}}
+{{#relationIds}}{{> RelationId entityName=../tscName}}{{/relationIds~}}
+{{#if generateConstructor}}{{>Constructor entityName=tscName}}{{/if~}}
+}
+{{/inline}}
+{}
+import { ApiProperty,ApiPropertyOptional } from '@nestjs/swagger';
+{{#fileImports}}{{> Import}}{{/fileImports}}
+
+{{> Entity}}

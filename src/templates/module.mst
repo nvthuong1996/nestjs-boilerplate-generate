@@ -1,0 +1,19 @@
+{}
+
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+{{#each databaseModel}}
+import { {{toServiceName this.tscName}} } from './services/{{toServiceFileName this.fileName}}';
+import { {{toControllerName this.tscName}} } from './controllers/{{toControllerFileName this.fileName}}';
+import { {{toEntityName this.tscName}}  } from './entities/{{toFileName this.fileName}}';
+{{/each}}
+
+
+@Module({
+    imports: [TypeOrmModule.forFeature([{{#each databaseModel}}{{toEntityName this.tscName}},{{/each}}])],
+    providers: [{{#each databaseModel}}{{toServiceName this.tscName}},{{/each}}],
+    exports: [{{#each databaseModel}}{{toServiceName this.tscName}},{{/each}}],
+    controllers: [{{#each databaseModel}}{{toControllerName this.tscName}},{{/each}}],
+})
+export class {{toModuleName moduleName}} {}

@@ -104,7 +104,19 @@ function readTOMLConfig(
                     key
                 )
             ) {
-                options.generationOptions[key] = loadedGenerationOptions[key];
+                if (key === "resultsPath") {
+                    const resultPath = path.resolve(
+                        process.cwd(),
+                        loadedGenerationOptions[key]
+                    );
+                    if (fs.existsSync(resultPath)) {
+                        throw new Error("Result path exist");
+                    }
+                    options.generationOptions[key] = resultPath;
+                } else {
+                    options.generationOptions[key] =
+                        loadedGenerationOptions[key];
+                }
             } else {
                 console.error(`Unknown generation option ${key}.`);
                 hasUnknownProperties = true;
@@ -115,11 +127,11 @@ function readTOMLConfig(
     const fullConfigFile =
         !hasUnknownProperties &&
         loadedConnectionOptions &&
-        loadedGenerationOptions &&
-        Object.keys(loadedConnectionOptions).length ===
-            Object.keys(options.connectionOptions).length &&
-        Object.keys(loadedGenerationOptions).length ===
-            Object.keys(options.generationOptions).length;
+        loadedGenerationOptions;
+    // && Object.keys(loadedConnectionOptions).length ===
+    // Object.keys(options.connectionOptions).length &&
+    // Object.keys(loadedGenerationOptions).length ===
+    // Object.keys(options.generationOptions).length;
 
     return {
         options,
